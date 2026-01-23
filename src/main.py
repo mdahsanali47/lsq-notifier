@@ -37,6 +37,7 @@ class LeadSquaredNotifier:
         self.db_user = os.environ.get("DB_USER")
         self.db_password = os.environ.get("DB_PASSWORD")
         self.db_name = os.environ.get("DB_NAME")
+        self.db_port = os.environ.get("DB_PORT")
 
         self.smtp_host = os.environ.get("SMTP_HOST")
         self.smtp_port = os.environ.get("SMTP_PORT")
@@ -56,6 +57,9 @@ class LeadSquaredNotifier:
         self.oci_folder_path = os.environ.get("OCI_FOLDER_PATH", "visit-plan-reports")
 
         self.dry_run = int(os.environ.get("DRY_RUN"))
+
+        # query to get active sales users from database
+        self.db_query = os.environ.get("DB_QUERY")
 
         required_vars = [
             self.host, self.access_key, self.secret_key, self.visit_plan_type_id,
@@ -100,7 +104,7 @@ class LeadSquaredNotifier:
             user=self.db_user,
             password=self.db_password,
             database=self.db_name,
-            port=int(os.environ.get("DB_PORT"))
+            port=int(self.db_port)
         )
 
     def get_current_weekdays(self):
@@ -132,15 +136,66 @@ class LeadSquaredNotifier:
         )
 
     def get_active_sales_users(self):
-        url = f"{self.host}/v2/UserManagement.svc/Users.Get"
+        url = f"{self.host}/v2/UserManagement.svc/User.AdvancedSearch"
         params = {'accessKey': self.access_key, 'secretKey': self.secret_key}
+        payload = {
+                    "Columns": {
+                        "Include_CSV": "UserID,FirstName,LastName,EmailAddress,Role,StatusCode,Team,TeamId,EmployeeId"
+                    },
+                    "GroupConditions": [
+                        {
+                        "Condition": [
+                            {
+                            "LookupName": "StatusCode",
+                            "Operator": "eq",
+                            "LookupValue": 0,
+                            "ConditionOperator": "AND"
+                            },
+                            {
+                            "LookupName": "State",
+                            "Operator": "eq",
+                            "LookupValue": "West Bengal",
+                            "ConditionOperator": "AND"
+                            },
+                            {
+                            "LookupName": "Role",
+                            "Operator": "neq",
+                            "LookupValue": "Administrator",
+                            "ConditionOperator": "AND"
+                            },
+                            {
+                            "LookupName": "Role",
+                            "Operator": "neq",
+                            "LookupValue": "Marketing_User",
+                            "ConditionOperator": "AND"
+                            },
+                            {
+                            "LookupName": "Team",
+                            "Operator": "neq",
+                            "LookupValue": "Captain Steel India Limited",
+                            "ConditionOperator": null
+                            }
+                        ],
+                        "GroupOperator": null
+                        }
+                    ],
+                    "Paging": {
+                        "PageIndex": 1,
+                        "PageSize": 1000
+                    }
+                }
+
         try:
-            response = self.session.get(url, params=params, timeout=30)
+            response = self.session.post(url=url, params=params, json=payload, timeout=30)
             response.raise_for_status()
-            all_users = response.json()
+            users_data = response.json()
+            total_users = users_data.get('SearchInfo')
+            logging.info(f"Found Active {total_users}")
+            
+            all_users = users_data.get('Users')
 
             active_sales_users = [
-                user for user in all_users if user.get('StatusCode') == 0 and user.get("Role") == "Sales_User"
+                user for user in all_users
             ]
 
             logging.info(f"found  {len(active_sales_users)} total active sales users")
@@ -154,14 +209,17 @@ class LeadSquaredNotifier:
         
     def get_active_sales_user_from_db(self):
         try:
+            stmt = self.db_query
+            if not stmt:
+                raise ValueError("Database query not found in environment variables")
             with self.get_db() as conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute("SELECT email_address, first_name, last_name FROM lsq_users_master WHERE status = 'Active' AND team_code in (2, 3)")
+                    cursor.execute(stmt)
             
                     users = cursor.fetchall()
             logging.info(f"found {len(users)} total active sales users from database")
-            users = random.sample(users, 35)
-            logging.info(f"selected {len(users)} random users for testing")
+            # users = random.sample(users, 35) # ------------------------------------------TESTING FOR 35 USERS
+            # logging.info(f"selected {len(users)} random users for testing")
             return users
         except pymysql.MySQLError as db_err:
             logging.exception(f"Failed to get users from database: {db_err}")
