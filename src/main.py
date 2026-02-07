@@ -135,77 +135,78 @@ class LeadSquaredNotifier:
             week_end_ist.date()
         )
 
-    def get_active_sales_users(self):
-        url = f"{self.host}/v2/UserManagement.svc/User.AdvancedSearch"
-        params = {'accessKey': self.access_key, 'secretKey': self.secret_key}
-        payload = {
-                    "Columns": {
-                        "Include_CSV": "UserID,FirstName,LastName,EmailAddress,Role,StatusCode,Team,TeamId,EmployeeId"
-                    },
-                    "GroupConditions": [
-                        {
-                        "Condition": [
-                            {
-                            "LookupName": "StatusCode",
-                            "Operator": "eq",
-                            "LookupValue": 0,
-                            "ConditionOperator": "AND"
-                            },
-                            {
-                            "LookupName": "State",
-                            "Operator": "eq",
-                            "LookupValue": "West Bengal",
-                            "ConditionOperator": "AND"
-                            },
-                            {
-                            "LookupName": "Role",
-                            "Operator": "neq",
-                            "LookupValue": "Administrator",
-                            "ConditionOperator": "AND"
-                            },
-                            {
-                            "LookupName": "Role",
-                            "Operator": "neq",
-                            "LookupValue": "Marketing_User",
-                            "ConditionOperator": "AND"
-                            },
-                            {
-                            "LookupName": "Team",
-                            "Operator": "neq",
-                            "LookupValue": "Captain Steel India Limited",
-                            "ConditionOperator": null
-                            }
-                        ],
-                        "GroupOperator": null
-                        }
-                    ],
-                    "Paging": {
-                        "PageIndex": 1,
-                        "PageSize": 1000
-                    }
-                }
+    # def get_active_sales_users(self):
+    #     url = f"{self.host}/v2/UserManagement.svc/User/AdvancedSearch"
+    #     params = {'accessKey': self.access_key, 'secretKey': self.secret_key}
+    #     payload = {
+    #                 "Columns": {
+    #                     "Include_CSV": "UserID,FirstName,LastName,EmailAddress,Role,StatusCode,Team,TeamId,EmployeeId"
+    #                 },
+    #                 "GroupConditions": [
+    #                     {
+    #                     "Condition": [
+    #                         {
+    #                         "LookupName": "StatusCode",
+    #                         "Operator": "eq",
+    #                         "LookupValue": 0,
+    #                         "ConditionOperator": "AND"
+    #                         },
+    #                         {
+    #                         "LookupName": "State",
+    #                         "Operator": "eq",
+    #                         "LookupValue": "West Bengal",
+    #                         "ConditionOperator": "AND"
+    #                         },
+    #                         {
+    #                         "LookupName": "Role",
+    #                         "Operator": "neq",
+    #                         "LookupValue": "Administrator",
+    #                         "ConditionOperator": "AND"
+    #                         },
+    #                         {
+    #                         "LookupName": "Role",
+    #                         "Operator": "neq",
+    #                         "LookupValue": "Marketing_User",
+    #                         "ConditionOperator": "AND"
+    #                         },
+    #                         {
+    #                         "LookupName": "Team",
+    #                         "Operator": "neq",
+    #                         "LookupValue": "Captain Steel India Limited",
+    #                         "ConditionOperator": None
+    #                         }
+    #                     ],
+    #                     "GroupOperator": None
+    #                     }
+    #                 ],
+    #                 "Paging": {
+    #                     "PageIndex": 1,
+    #                     "PageSize": 1000
+    #                 }
+    #             }
 
-        try:
-            response = self.session.post(url=url, params=params, json=payload, timeout=30)
-            response.raise_for_status()
-            users_data = response.json()
-            total_users = users_data.get('SearchInfo')
-            logging.info(f"Found Active {total_users}")
+    #     try:
+    #         response = self.session.post(url=url, params=params, json=payload, timeout=30)
+    #         response.raise_for_status()
+    #         users_data = response.json()
+    #         total_users = users_data.get('SearchInfo')
+    #         logging.info(f"Found Active {total_users}")
             
-            all_users = users_data.get('Users')
+    #         all_users = users_data.get('Users')
 
-            active_sales_users = [
-                user for user in all_users
-            ]
+    #         active_sales_users = [
+    #             user for user in all_users
+    #         ]
 
-            logging.info(f"found  {len(active_sales_users)} total active sales users")
-            # taking random users for testing
-            active_sales_users = random.sample(active_sales_users, 5)
+    #         logging.info(f"found  {len(active_sales_users)} total active sales users")
+    #         # taking random users for testing
+    #         active_sales_users = random.sample(active_sales_users, 5)
+    #         logging.info(f"taking random {len(active_sales_users)} users for testing")
         
-            return active_sales_users
-        except requests.exceptions.RequestException as e:
-            logging.exception(f"Failed to get users from LeadSquared: {e}")
-            return None
+    #         return active_sales_users
+    #     except requests.exceptions.RequestException as e:
+    #         logging.exception(f"Failed to get users from LeadSquared: {e}")
+    #         return None
         
     def get_active_sales_user_from_db(self):
         try:
@@ -218,7 +219,7 @@ class LeadSquaredNotifier:
             
                     users = cursor.fetchall()
             logging.info(f"found {len(users)} total active sales users from database")
-            # users = random.sample(users, 35) # ------------------------------------------TESTING FOR 35 USERS
+            # users = random.sample(users, 25) # ------------------------------------------TESTING FOR 35 USERS
             # logging.info(f"selected {len(users)} random users for testing")
             return users
         except pymysql.MySQLError as db_err:
@@ -270,7 +271,7 @@ class LeadSquaredNotifier:
 
 
     def process_user_task(self, user, total_incomplete_tasks, all_tasks_for_user, week_start_date, week_end_date):
-        user_email = user.get("email_address")
+        user_email = user.get("email")
         if not user_email:
             return None
 
@@ -315,8 +316,7 @@ class LeadSquaredNotifier:
 
         return {
             "UserEmail": user_email,
-            "FirstName": user.get("first_name"),
-            "LastName": user.get("last_name"),
+            "UserName": user.get("name"),
             **daily_task_counts,
             "TotalIncompleteTasks": total_incomplete_tasks
         }
@@ -360,34 +360,68 @@ class LeadSquaredNotifier:
             return False
 
     def send_reminder_email(self, user, week_start_date, week_end_date):
-        receiver_email = user.get("email_address")
-        first_name = user.get('first_name', 'there')
+        receiver_email = user.get("email")
+        user_name = user.get("name")
 
-        subject = f"Action Required: Create Your Visit Plan for the Week {week_start_date} to {week_end_date}"
+        cc_emails = ["sk.nasiruddin@captainsteel.com"]
+
+        subject = (
+        f"Gentle Reminder: Submit Your EPJP for the Week "
+        f"{week_start_date.strftime('%B %d')} to {week_end_date.strftime('%B %d')}"
+        )
+
         body = f"""
-        Dear {first_name},
+        <html>
+        <body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #333;">
+            <p>Dear {user_name},</p>
 
-        This is an automated reminder.
+            <p>
+            This is a gentle reminder to submit your
+            <strong>EPJP</strong> in <strong>LeadSquared</strong> for the current week
+            (<strong>{week_start_date.strftime('%B %d')} to {week_end_date.strftime('%B %d')}</strong>).
+            </p>
 
-        We've noticed that you have not yet created any visit plans in LeadSquared for the current week of {week_start_date.strftime('%B %d')} to {week_end_date.strftime('%B %d')}.
+            <p>
+            If you have already submitted your EPJP and it is still pending,
+            kindly ensure that it is approved by your reporting manager.
+            </p>
 
-        To ensure proper planning and tracking, please create your visit plans for the week at your earliest convenience.
+            <p>
+            <em>If EPJP submission is not applicable to your role, please ignore this message.</em>
+            </p>
 
-        Thank you,
-        Captain Steel India Limited
+            <br />
+
+            <p>
+            Thank you for your cooperation.
+            </p>
+
+            <p>
+            Best regards,<br />
+            <strong>Captain Steel India Limited</strong><br />
+            IT Team
+            </p>
+        </body>
+        </html>
         """
 
         message = MIMEMultipart()
         message['From'] = f"{self.sender_name} <{self.sender_email}>"
         message['To'] = receiver_email
         message['Subject'] = subject
-        message.attach(MIMEText(body, 'plain'))
+
+        if cc_emails:
+            message['Cc'] = ", ".join(cc_emails)
+
+        message.attach(MIMEText(body, 'html'))
+
+        all_recipients = [receiver_email] + cc_emails
 
         try:
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.smtp_user, self.smtp_password)
-                server.sendmail(self.sender_email, receiver_email, message.as_string())
+                server.sendmail(self.sender_email, all_recipients, message.as_string())
         except Exception as e:
             logging.exception(f"failed to send email to: {receiver_email}")
 
@@ -412,11 +446,11 @@ class LeadSquaredNotifier:
         users_to_notify = []
 
         for user in active_users:
-            email = user.get("email_address")
+            email = user.get("email")
             if not email:
                 continue
 
-            logging.info(f"Checking user: {user.get('first_name')} {user.get('last_name')} ({email})")
+            logging.info(f"Checking user: {user.get('name')} ({email})")
 
             time.sleep(0.25)
 
@@ -455,11 +489,12 @@ class LeadSquaredNotifier:
         if not self.dry_run and users_to_notify:
             logging.info(f"LIVE MODE: Sending reminder emails to {len(users_to_notify)} users...")
             for user in users_to_notify:
+                # user["email"] = "mdahsanali47@gmail.com"  #---- FOR TESTING
                 self.send_reminder_email(user, week_start, week_end)
         elif self.dry_run and users_to_notify:
             logging.warning("DRY RUN: The following users would receive a reminder:")
             for user in users_to_notify:
-                logging.info(f"  - [WOULD SEND TO]: {user.get('FirstName')} {user.get('LastName')} ({user.get('EmailAddress')})")
+                logging.info(f"  - [WOULD SEND TO]: {user.get('name')} ({user.get('email')})")
         elif not users_to_notify:
             logging.info("All users have visit plans. No notifications needed.")
 
